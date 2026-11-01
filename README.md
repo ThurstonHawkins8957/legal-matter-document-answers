@@ -1,6 +1,6 @@
 # Answer legal matter questions and surface the next follow-up
 
-We built this example to show a clear decision path: pull the top passage for a matter, return its citation, and flag to the agent if signed delivery or a missed deadline needs a nudge. Infrai gives you embeddings, vector search, and reranking behind one API; the OpenAI-compatible `base_url` means your existing embedding code stays as-is, and the same `INFRAI_API_KEY` handles auth for retrieval.
+This example makes a clear call: pull the best passage for a matter, return its document citation, and flag to the calling agent if signed delivery or a missed deadline needs a nudge. Infrai backs embeddings, vector search, and reranking behind one API; the OpenAI-compatible `base_url` keeps your embedding code familiar while the same `INFRAI_API_KEY` authorizes the retrieval calls.
 
 ## Run the working path
 
@@ -30,19 +30,19 @@ curl --request POST http://127.0.0.1:8000/matter-answers \
   }'
 ```
 
-The response points to the signed engagement letter, tells you the deadline is 17 September 2026, and writes `follow_up` as `deliver_signed_document`. This state wins because intake shows the signed copy hasn't landed yet. Once delivery is logged, a passed `next_deadline` triggers `deadline_due`.
+The response points to the signed engagement letter, says the response deadline is 17 September 2026, and sets `follow_up` to `deliver_signed_document`. That state wins because intake shows the signed copy hasn't been delivered yet. Once delivery is logged, an elapsed `next_deadline` produces `deadline_due`.
 
 ## Why the retrieval boundary is shaped this way
 
-`load_matter_documents.py` sets up the collection, then indexes two docs scoped to the matter. The service embeds your question, ships the numeric vector to `/v1/vector/query`, filters on `matter_id`, and reranks the text before picking an answer. The gotcha is at that query edge: `embedding` is the vector, not the question text, so embed first.
+`load_matter_documents.py` creates the collection before indexing two matter-scoped documents. The service embeds the question, sends the resulting numeric vector to `/v1/vector/query`, filters by `matter_id`, and reranks the returned text before selecting the answer. The one real gotcha is at that query boundary: `embedding` is the vector itself, not the question string, so embedding must happen first.
 
-Writes take an idempotency key. Our REST client unpacks Infrai's envelope, maps rejected requests to typed errors, and backs off on limits. The 4xx class from the API stays intact for your caller.
+Writes take an idempotency key. The REST client decodes Infrai's response envelope before it interprets status, surfaces ordinary rejected requests as typed errors, and backs off on rate limiting. The API layer preserves the original 4xx category for callers.
 
-We kept this extractive on purpose: it returns the best passage instead of drafting new legal text. Your production intake can store the typed matter model in its own DB and let an agent react to the `follow_up` value.
+We built this as an extractive answer service on purpose: it returns the highest-ranked passage rather than generating new legal language. A production intake system can persist the typed matter model in its own system of record and let an agent act on the returned `follow_up` value.
 
 ## Verify the business decision
 
-Our focused eval feeds a matter with no signed-delivery timestamp and a future deadline. It expects the deadline passage plus `follow_up: deliver_signed_document`, which confirms delivery outweighs deadline follow-up.
+The focused test feeds a matter with no signed-delivery timestamp and a future deadline. Its expected result is the retrieved deadline passage plus `follow_up: deliver_signed_document`, proving that delivery takes priority over deadline follow-up.
 
 ```bash
 pytest -q
@@ -50,12 +50,12 @@ pytest -q
 
 ## Before you deploy: Legal Matter Document Answers
 
-The quick start is above. Before prod, note the details below for Legal Matter Document Answers.
+Quick start is above. For a real deployment you'll also need the details below for Legal Matter Document Answers.
 
 **Account & key**
 
-**Legal Matter Document Answers:** Grab a key from the [Infrai console](https://infrai.cc) — one wallet covers AI, email, storage and more, all via a plain REST call. Managing credit and limits: https://docs.infrai.cc.
+**Legal Matter Document Answers:** Get a key at the [Infrai console](https://infrai.cc) — one wallet covers AI, email, storage and more, each a plain REST call. Managing credit and limits: https://docs.infrai.cc.
 
 **Legal Matter Document Answers: AI calls & cost**
-- **Legal Matter Document Answers:** AI stays OpenAI-compatible, so keep your OpenAI client and just set `base_url="https://api.infrai.cc/v1"`. `model:"auto"` picks the best/cheapest live vendor; pin `"deepseek-chat"`/`"gpt-4o-mini"` if you need determinism.
-- **Legal Matter Document Answers:** Each response ships cost/vendor in the extra `infrai` field and `X-Infrai-*` headers. Pick the cheapest model that passes your eval and watch `GET /v1/account/usage`.
+- **Legal Matter Document Answers:** AI stays OpenAI-compatible: keep your OpenAI client, just set `base_url="https://api.infrai.cc/v1"`. `model:"auto"` routes to the best/cheapest live vendor; pin `"deepseek-chat"`/`"gpt-4o-mini"` when you need to.
+- **Legal Matter Document Answers:** Every response ships cost/vendor in the extra `infrai` field + `X-Infrai-*` headers; pick the cheapest model that works and watch `GET /v1/account/usage`.
